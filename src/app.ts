@@ -1,9 +1,19 @@
+import { logger } from "./utils/logger.js";
+
 // Controllers
-import { getClientsMagento } from "./controllers/clientsController.js";
+import * as clientsController from "./controllers/clientsController.js";
 
 export async function ingestNewCustomers() {
   // Busca clientes no Magento
-  const clients = await getClientsMagento();
+  const clients = await clientsController.getClientsMagento();
+
+  if (!clients.success || !("data" in clients)) {
+    logger.warning("Nenhum cliente encontrado no Magento.");
+    return;
+  }
+  logger.info(`Clientes encontrados no Magento: ${clients.data.length}`);
+
   // Salva eles no CRM
+  const saveResponse = await clientsController.saveClientsToCRM(clients.data);
   // Salva eles no banco de dados via api
 }

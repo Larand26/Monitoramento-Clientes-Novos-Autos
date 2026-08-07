@@ -3,6 +3,7 @@ import type { ErrorResponse } from "../interfaces/error.type.js";
 import type { Response } from "../interfaces/response.type.js";
 
 import { getClientsMagento as getClientsService } from "../services/clientsService.js";
+import { saveClientsToCRM as saveClientsToCRMService } from "../services/clientsService.js";
 
 export async function getClientsMagento(): Promise<Response | ErrorResponse> {
   try {
@@ -13,6 +14,29 @@ export async function getClientsMagento(): Promise<Response | ErrorResponse> {
       success: false,
       code: "ERR_MAGENTO_FETCH",
       message: "Erro ao buscar clientes do Magento.",
+      archive: "clientsController.ts",
+      error: error,
+    };
+  }
+}
+
+export async function saveClientsToCRM(
+  clients: any[],
+): Promise<Response | ErrorResponse> {
+  try {
+    // Lógica para salvar clientes no CRM
+    // Retorna uma resposta de sucesso
+    return {
+      success: true,
+      message: "Clientes salvos no CRM com sucesso.",
+      data: clients,
+    };
+  } catch (error) {
+    logger.error("Error saving clients to CRM:");
+    return {
+      success: false,
+      code: "ERR_CRM_SAVE",
+      message: "Erro ao salvar clientes no CRM.",
       archive: "clientsController.ts",
       error: error,
     };
