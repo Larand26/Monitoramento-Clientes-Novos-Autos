@@ -5,6 +5,7 @@ export const appConfig = {
   app: {
     mode: process.env.MODE || "production",
     timeLost: process.env.TIME_LOST || "180",
+    groupId: process.env.GROUP_ID || "1",
     cronIngest: process.env.CRON_INGEST || "0 0 * * *",
     cronUpdate: process.env.CRON_UPDATE || "0 0 * * *",
   },

@@ -1,5 +1,5 @@
 // Controllers
-import { getClientsMagento } from "./controllers/clientsController";
+import { getClientsMagento } from "./controllers/clientsController.js";
 
 export async function ingestNewCustomers() {
   // Busca clientes no Magento
