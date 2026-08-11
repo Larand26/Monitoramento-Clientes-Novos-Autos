@@ -4,7 +4,7 @@ import type { Response } from "../interfaces/response.type";
 
 import * as utils from "../utils/utils.js";
 
-import { appConfig } from "../config/app.config.js";
+import appConfig from "../config/app.config.js";
 
 import axios from "axios";
 

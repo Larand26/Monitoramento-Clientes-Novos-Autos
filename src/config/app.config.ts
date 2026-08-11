@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-export const appConfig = {
+export default {
   app: {
     mode: process.env.MODE || "production",
     timeLost: process.env.TIME_LOST || "180",
