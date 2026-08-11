@@ -31,4 +31,7 @@ export default {
     url: process.env.LOGGER_URL || "",
     active: process.env.LOGGER_ACTIVE === "true",
   },
+  mongodb: {
+    uri: process.env.MONGODB_URI || "mongodb://localhost:27017/mydatabase",
+  },
 };
