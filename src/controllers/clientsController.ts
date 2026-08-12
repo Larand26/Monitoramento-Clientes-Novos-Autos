@@ -24,13 +24,7 @@ export async function saveClientsToCRM(
   clients: any[],
 ): Promise<Response | ErrorResponse> {
   try {
-    // Lógica para salvar clientes no CRM
-    // Retorna uma resposta de sucesso
-    return {
-      success: true,
-      message: "Clientes salvos no CRM com sucesso.",
-      data: clients,
-    };
+    return await saveClientsToCRMService(clients);
   } catch (error) {
     logger.error("Error saving clients to CRM:");
     return {

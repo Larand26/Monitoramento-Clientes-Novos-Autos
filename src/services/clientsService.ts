@@ -3,6 +3,7 @@ import type { ErrorResponse } from "../interfaces/error.type";
 import type { Response } from "../interfaces/response.type";
 
 import * as utils from "../utils/utils.js";
+import * as rdService from "../services/rdService.js";
 
 import appConfig from "../config/app.config.js";
 
@@ -63,8 +64,25 @@ export async function saveClientsToCRM(
   clients: any[],
 ): Promise<Response | ErrorResponse> {
   try {
-    // Lógica para salvar clientes no CRM
-    // Retorna uma resposta de sucesso
+    // Busca o token de autenticação do CRM
+    const rdToken = await rdService.getRdToken();
+
+    if (!rdToken) {
+      logger.error("Error fetching RD Station token");
+      return {
+        success: false,
+        code: "ERR_RD_TOKEN",
+        message: "Erro ao buscar token do RD Station.",
+        archive: "clientsService.ts",
+        error: "Token não encontrado.",
+      };
+    }
+
+    // Busca o cliente (organization) no CRM
+
+    // Se o cliente (organization) não existir, cria ele no CRM
+
+    // Cria a negocação se o cliente (organization) não tiver
     return {
       success: true,
       message: "Clientes salvos no CRM com sucesso.",
