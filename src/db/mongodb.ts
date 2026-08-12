@@ -64,6 +64,26 @@ export async function findData(
   }
 }
 
+export async function findOneData(
+  model: mongoose.Model<any>,
+  query: any,
+  collectionName: string,
+): Promise<any | null> {
+  try {
+    const modelCollection = model.collection.name;
+    if (collectionName && collectionName !== modelCollection) {
+      throw new Error(
+        `Collection mismatch: received '${collectionName}', but model writes to '${modelCollection}'`,
+      );
+    }
+    const data = await model.findOne(query);
+    return data;
+  } catch (error) {
+    console.error("Error finding one data in MongoDB:", error);
+    throw error;
+  }
+}
+
 export async function updateData(
   model: mongoose.Model<any>,
   query: any,

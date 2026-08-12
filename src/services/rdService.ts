@@ -3,20 +3,63 @@ import appConfig from "../config/app.config.js";
 
 import { logger } from "../utils/logger.js";
 
-import { connectToMongoDB, disconnectFromMongoDB } from "../db/mongodb.js";
-import { findData, updateData } from "../db/mongodb.js";
+import { findOneData, updateData } from "../db/mongodb.js";
 import RdTokenModel from "../models/rdToken.model.js";
 
-export async function getRdToken() {
+interface ItokenData {
+  access_token: string;
+  refresh_token: string;
+  expires_at: Date;
+}
+
+export async function getRdToken(): Promise<string | null> {
   try {
-    await connectToMongoDB();
-    const tokenData = await findData(RdTokenModel, {}, "rd_token");
-    console.log("Token data retrieved from MongoDB:", tokenData);
-    return tokenData;
+    const tokenData: ItokenData | null = await findOneData(
+      RdTokenModel,
+      {},
+      "rd_token",
+    );
+
+    if (!tokenData) {
+      return null;
+    }
+
+    console.log(tokenData);
+
+    const accessToken = tokenData.access_token;
+    const currentTime = new Date();
+    if (tokenData.expires_at > currentTime) {
+      return accessToken;
+    }
+
+    const refreshToken = tokenData.refresh_token;
+    const body = new URLSearchParams();
+    body.append("client_id", appConfig.rd.clientId);
+    body.append("client_secret", appConfig.rd.clientSecret);
+    body.append("refresh_token", refreshToken);
+    body.append("grant_type", "refresh_token");
+
+    const response = await axios.post(
+      "https://api.rd.services/oauth2/token",
+      body,
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      },
+    );
+
+    const newTokenData: ItokenData = {
+      access_token: response.data.access_token,
+      refresh_token: response.data.refresh_token,
+      expires_at: new Date(Date.now() + response.data.expires_in * 500),
+    };
+
+    await updateData(RdTokenModel, {}, newTokenData, "rd_token");
+
+    return newTokenData.access_token;
   } catch (error) {
     logger.error("Error occurred while fetching RD token:");
     throw error;
-  } finally {
-    await disconnectFromMongoDB();
   }
 }

@@ -10,8 +10,8 @@ export default {
     cronUpdate: process.env.CRON_UPDATE || "0 0 * * *",
   },
   rd: {
-    token: process.env.RD_TOKEN || "your_default_token",
-    url: process.env.RD_BASE_URL || "https://crm.rdstation.com",
+    clientId: process.env.RD_CLIENT_ID || "your_default_client_id",
+    clientSecret: process.env.RD_CLIENT_SECRET || "your_default_client_secret",
   },
   internalApi: {
     url: process.env.INTERNAL_API_URL || "http://localhost:3000",
