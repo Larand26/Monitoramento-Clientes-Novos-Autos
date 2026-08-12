@@ -1,6 +1,7 @@
 import { logger } from "../utils/logger.js";
 import type { ErrorResponse } from "../interfaces/error.type";
 import type { Response } from "../interfaces/response.type";
+import type { ClientMagento } from "../interfaces/client.type";
 
 import * as utils from "../utils/utils.js";
 import * as rdService from "../services/rdService.js";
@@ -41,7 +42,7 @@ export async function getClientsMagento(): Promise<Response | ErrorResponse> {
       },
     );
 
-    const clients: any[] = response.data.items || [];
+    const clients: ClientMagento[] = response.data.items || [];
 
     return {
       success: true,
@@ -61,7 +62,7 @@ export async function getClientsMagento(): Promise<Response | ErrorResponse> {
 }
 
 export async function saveClientsToCRM(
-  clients: any[],
+  clients: ClientMagento[],
 ): Promise<Response | ErrorResponse> {
   try {
     // Busca o token de autenticação do CRM
@@ -78,11 +79,13 @@ export async function saveClientsToCRM(
       };
     }
 
-    // Busca o cliente (organization) no CRM
-
-    // Se o cliente (organization) não existir, cria ele no CRM
-
-    // Cria a negocação se o cliente (organization) não tiver
+    Promise.all(
+      clients.map(async (client) => {
+        // Busca o cliente (organization) no CRM
+        // Se o cliente (organization) não existir, cria ele no CRM
+        // Cria a negociação se o cliente (organization) não tiver
+      }),
+    );
     return {
       success: true,
       message: "Clientes salvos no CRM com sucesso.",
