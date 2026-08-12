@@ -24,8 +24,6 @@ export async function getRdToken(): Promise<string | null> {
       return null;
     }
 
-    console.log(tokenData);
-
     const accessToken = tokenData.access_token;
     const currentTime = new Date();
     if (tokenData.expires_at > currentTime) {
@@ -60,6 +58,37 @@ export async function getRdToken(): Promise<string | null> {
     return newTokenData.access_token;
   } catch (error) {
     logger.error("Error occurred while fetching RD token:");
+    throw error;
+  }
+}
+
+export async function getOrganizationIdByName(
+  token: string,
+  organizationName: string,
+): Promise<string | null> {
+  try {
+    const response = await axios.get(
+      `${appConfig.rd.url}/crm/v2/organizations`,
+      {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        params: {
+          "page[number]": 1,
+          "page[size]": 1,
+          filter: `name:"${organizationName}"`,
+        },
+      },
+    );
+
+    if (response.data && response.data.data && response.data.data.length > 0) {
+      return response.data.data[0].id;
+    } else {
+      return null;
+    }
+  } catch (error) {
+    logger.error("Error occurred while fetching organization ID by name:");
     throw error;
   }
 }

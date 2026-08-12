@@ -12,6 +12,7 @@ export default {
   rd: {
     clientId: process.env.RD_CLIENT_ID || "your_default_client_id",
     clientSecret: process.env.RD_CLIENT_SECRET || "your_default_client_secret",
+    url: process.env.RD_BASE_URL || "https://api.rd.services",
   },
   internalApi: {
     url: process.env.INTERNAL_API_URL || "http://localhost:3000",

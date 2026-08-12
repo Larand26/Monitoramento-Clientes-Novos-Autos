@@ -82,6 +82,13 @@ export async function saveClientsToCRM(
     Promise.all(
       clients.map(async (client) => {
         // Busca o cliente (organization) no CRM
+        const organizationId = await rdService.getOrganizationIdByName(
+          rdToken,
+          client.firstname,
+        );
+        logger.info(
+          `Organization ID for ${client.firstname}: ${organizationId}`,
+        );
         // Se o cliente (organization) não existir, cria ele no CRM
         // Cria a negociação se o cliente (organization) não tiver
       }),
