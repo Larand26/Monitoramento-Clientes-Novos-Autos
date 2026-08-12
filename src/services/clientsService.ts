@@ -90,6 +90,15 @@ export async function saveClientsToCRM(
           `Organization ID for ${client.firstname}: ${organizationId}`,
         );
         // Se o cliente (organization) não existir, cria ele no CRM
+        if (!organizationId) {
+          const newOrganizationId = await rdService.createOrganization(
+            rdToken,
+            client,
+          );
+          logger.info(
+            `New Organization ID for ${client.firstname}: ${newOrganizationId}`,
+          );
+        }
         // Cria a negociação se o cliente (organization) não tiver
       }),
     );

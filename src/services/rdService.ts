@@ -6,6 +6,8 @@ import { logger } from "../utils/logger.js";
 import { findOneData, updateData } from "../db/mongodb.js";
 import RdTokenModel from "../models/rdToken.model.js";
 
+import type { ClientMagento } from "../interfaces/client.type.js";
+
 interface ItokenData {
   access_token: string;
   refresh_token: string;
@@ -89,6 +91,36 @@ export async function getOrganizationIdByName(
     }
   } catch (error) {
     logger.error("Error occurred while fetching organization ID by name:");
+    throw error;
+  }
+}
+
+export async function createOrganization(
+  token: string,
+  client: ClientMagento,
+): Promise<string> {
+  try {
+    const body = {
+      data: {
+        name: client.firstname,
+        owner_id: appConfig.rd.ownerId,
+      },
+    };
+
+    const response = await axios.post(
+      `${appConfig.rd.url}/crm/v2/organizations`,
+      body,
+      {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    return response.data.data.id;
+  } catch (error) {
+    logger.error("Error occurred while creating organization:");
     throw error;
   }
 }
