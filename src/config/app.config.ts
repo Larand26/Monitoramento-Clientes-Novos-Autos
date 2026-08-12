@@ -14,6 +14,7 @@ export default {
     clientSecret: process.env.RD_CLIENT_SECRET || "your_default_client_secret",
     url: process.env.RD_BASE_URL || "https://api.rd.services",
     ownerId: process.env.RD_OWNER_ID || "your_default_owner_id",
+    dealStageId: process.env.RD_DEAL_STAGE_ID || "your_default_deal_stage_id",
   },
   internalApi: {
     url: process.env.INTERNAL_API_URL || "http://localhost:3000",
