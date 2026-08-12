@@ -185,3 +185,24 @@ export async function createDeal(
     throw error;
   }
 }
+
+async function getCustomfields(token: string, entity: string) {
+  try {
+    const response = await axios.get(
+      `${appConfig.rd.url}/crm/v2/custom_fields`,
+      {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        params: {
+          entity,
+        },
+      },
+    );
+    return response.data.data;
+  } catch (error) {
+    logger.error("Error occurred while fetching custom fields:");
+    throw error;
+  }
+}
