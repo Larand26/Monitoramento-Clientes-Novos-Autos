@@ -15,5 +15,13 @@ export async function ingestNewCustomers() {
 
   // Salva eles no CRM
   const saveResponse = await clientsController.saveClientsToCRM(clients.data);
+
+  if (!saveResponse.success) {
+    logger.error(
+      `Erro ao salvar clientes no CRM: ${saveResponse.message} - ${saveResponse.code}`,
+    );
+    return;
+  }
+
   // Salva eles no banco de dados via api
 }
