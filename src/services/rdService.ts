@@ -164,6 +164,7 @@ export async function getDealIdByOrganizationId(
 export async function createDeal(
   token: string,
   organizationId: string,
+  contactId: string,
   client: ClientMagento,
 ): Promise<string> {
   try {
@@ -174,6 +175,7 @@ export async function createDeal(
         stage_id: appConfig.rd.dealStageId,
         owner_id: appConfig.rd.ownerId,
         organization_id: organizationId,
+        contact_ids: [contactId],
       },
     };
 
@@ -191,6 +193,66 @@ export async function createDeal(
     return response.data.data.id;
   } catch (error) {
     logger.error("Error occurred while creating deal:");
+    throw error;
+  }
+}
+
+export async function getContactIdByOrganizationId(
+  token: string,
+  organizationId: string,
+): Promise<string | null> {
+  try {
+    const response = await axios.get(`${appConfig.rd.url}/crm/v2/contacts`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      params: {
+        "page[number]": 1,
+        "page[size]": 1,
+        filter: `organization_id:${organizationId}`,
+      },
+    });
+    if (response.data && response.data.data && response.data.data.length > 0) {
+      return response.data.data[0].id;
+    } else {
+      return null;
+    }
+  } catch (error) {
+    logger.error("Error occurred while fetching contact ID by name:");
+    throw error;
+  }
+}
+
+export async function createContact(
+  token: string,
+  client: ClientMagento,
+): Promise<string> {
+  try {
+    const body = {
+      data: {
+        name: client.firstname,
+        emails: [{ email: client.email }],
+        phones: [
+          { phone: client.addresses?.[0]?.telephone || "", type: "mobile" },
+        ],
+      },
+    };
+
+    const response = await axios.post(
+      `${appConfig.rd.url}/crm/v2/contacts`,
+      body,
+      {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    return response.data.data.id;
+  } catch (error) {
+    logger.error("Error occurred while creating contact:");
     throw error;
   }
 }
