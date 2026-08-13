@@ -27,4 +27,13 @@ export async function ingestNewCustomers() {
   const dbResponse = await clientsController.saveClientsToDatabase(
     saveResponse.data,
   );
+
+  if (!dbResponse.success) {
+    logger.error(
+      `Erro ao salvar clientes no banco de dados: ${dbResponse.message} - ${dbResponse.code}`,
+    );
+    return;
+  }
+
+  console.log(`Clientes salvos no banco de dados: ${dbResponse.data.length}`);
 }

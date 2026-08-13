@@ -16,4 +16,5 @@ export interface ClientMagento {
   disable_auto_group_change: number;
   extension_attributes: { is_subscribed: boolean };
   custom_attributes: { attribute_code: string; value: string }[];
+  organizationId?: string | null;
 }

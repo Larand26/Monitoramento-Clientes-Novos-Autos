@@ -3,8 +3,11 @@ import type { ErrorResponse } from "../interfaces/error.type";
 import type { Response } from "../interfaces/response.type";
 import type { ClientMagento } from "../interfaces/client.type";
 
+import ClientModel from "../models/client.model.js";
+
 import * as utils from "../utils/utils.js";
 import * as rdService from "../services/rdService.js";
+import * as mongodb from "../db/mongodb.js";
 
 import appConfig from "../config/app.config.js";
 
@@ -156,19 +159,72 @@ export async function saveClientsToDatabase(
   clients: ClientMagento[],
 ): Promise<Response | ErrorResponse> {
   try {
-    // Lógica para salvar clientes no banco de dados
-    // Aqui você pode implementar a lógica específica para salvar os clientes no seu banco de dados
+    // 1. Guardamos o resultado de todas as operações
+    const results = await Promise.all(
+      clients.map(async (client) => {
+        // Proteção caso taxvat venha nulo/undefined
+        const cnpjLimpo = client.taxvat
+          ? client.taxvat.replace(/[^a-zA-Z0-9]/g, "")
+          : "";
+
+        const c = await mongodb.findOneData(
+          ClientModel,
+          { magento_id: String(client.id) },
+          "clients",
+        );
+
+        if (c) {
+          logger.info(
+            `Cliente ${client.firstname} já existe no banco de dados.`,
+          );
+          return { success: true, data: c };
+        }
+
+        const data = {
+          magento_id: String(client.id),
+          rd_station_id: client.organizationId || null,
+          name: client.firstname,
+          cnpj: cnpjLimpo,
+          status: "IN_CRM",
+          created_at: new Date(client.created_at),
+          updated_at: new Date(client.updated_at),
+        };
+
+        try {
+          await mongodb.insertData(ClientModel, data, "clients");
+          return { success: true, data: data };
+        } catch (error) {
+          // Passamos o 'error' real para o logger
+          logger.error(`Erro ao inserir cliente ${client.id} no DB`);
+          return { success: false, error: { data, error } };
+        }
+      }),
+    );
+    const failedInserts = results.filter((res) => res.success === false);
+
+    if (failedInserts.length > 0) {
+      return {
+        success: false,
+        code: "ERR_DB_INSERT_PARTIAL",
+        message: `Atenção: ${failedInserts.length} cliente(s) falharam ao salvar no banco.`,
+        archive: "clientsService.ts",
+        error: failedInserts, // Retorna quais falharam para debugar
+      };
+    }
+
+    // 3. Se passou direto, todos deram certo
     return {
       success: true,
-      message: "Clientes salvos no banco de dados com sucesso.",
-      data: clients,
+      message: "Todos os clientes foram salvos no banco de dados com sucesso.",
+      data: results,
     };
   } catch (error) {
-    logger.error("Error saving clients to database:");
+    // Esse catch agora pega erros gerais (ex: falha de rede, erro no map, etc)
+    logger.error("Erro geral ao processar clientes para o banco");
     return {
       success: false,
       code: "ERR_DB_SAVE",
-      message: "Erro ao salvar clientes no banco de dados.",
+      message: "Erro catastrófico ao salvar clientes no banco de dados.",
       archive: "clientsService.ts",
       error: error,
     };
