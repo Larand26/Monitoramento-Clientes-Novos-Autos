@@ -79,24 +79,21 @@ export async function saveClientsToCRM(
       };
     }
 
-    Promise.all(
+    const updatedClients = await Promise.all(
       clients.map(async (client) => {
         let organizationId: string | null = null;
         let contactId: string | null = null;
+        let dealId: string | null = null;
+
         // Busca o cliente (organization) no CRM
         organizationId = await rdService.getOrganizationIdByName(
           rdToken,
           client.firstname,
         );
-        logger.info(
-          `Organization ID for ${client.firstname}: ${organizationId}`,
-        );
+
         // Se o cliente (organization) não existir, cria ele no CRM
         if (!organizationId) {
           organizationId = await rdService.createOrganization(rdToken, client);
-          logger.info(
-            `New Organization ID for ${client.firstname}: ${organizationId}`,
-          );
         }
 
         // Busca o contato (Contacts) no CRM
@@ -111,27 +108,37 @@ export async function saveClientsToCRM(
         }
 
         // Busca a negociação (deal) no CRM
-        const dealId = await rdService.getDealIdByOrganizationId(
+        dealId = await rdService.getDealIdByOrganizationId(
           rdToken,
           organizationId,
         );
-        logger.info(`Deal ID for ${client.firstname}: ${dealId}`);
 
         if (!dealId) {
           // Cria a negociação (deal) no CRM
-          await rdService.createDeal(
+          dealId = await rdService.createDeal(
             rdToken,
             organizationId,
             contactId,
             client,
           );
         }
+
+        logger.info(
+          `Organization ID para ${client.firstname}: ${organizationId}`,
+        );
+        logger.info(`Contact ID para ${client.firstname}: ${contactId}`);
+        logger.info(`Deal ID para ${client.firstname}: ${dealId}`);
+
+        return {
+          ...client,
+          organizationId,
+        };
       }),
     );
     return {
       success: true,
       message: "Clientes salvos no CRM com sucesso.",
-      data: clients,
+      data: updatedClients,
     };
   } catch (error) {
     logger.error("Error saving clients to CRM:");
