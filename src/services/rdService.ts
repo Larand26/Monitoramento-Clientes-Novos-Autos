@@ -112,6 +112,9 @@ export async function createOrganization(
           estado: client.addresses?.[0]?.region?.region_code || "",
           "razao-social": client.firstname,
         },
+        address: {
+          line: client.addresses?.[0]?.street?.join(" ") || "",
+        },
       },
     };
 
