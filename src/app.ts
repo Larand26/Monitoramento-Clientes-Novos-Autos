@@ -37,3 +37,10 @@ export async function ingestNewCustomers() {
 
   console.log(`Clientes salvos no banco de dados: ${dbResponse.data.length}`);
 }
+
+export async function updateClients() {
+  // Busca clientes no Banco de Dados
+  const clientsResponse = await clientsController.getClientsFromDatabase();
+  // Verifica se ele tem Pedidos na Loja em lotes
+  // Atualiza o status do cliente no banco de dados
+}

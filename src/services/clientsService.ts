@@ -230,3 +230,25 @@ export async function saveClientsToDatabase(
     };
   }
 }
+
+export async function getClientsFromDatabase(): Promise<
+  Response | ErrorResponse
+> {
+  try {
+    const clients = await mongodb.findData(ClientModel, {}, "clients");
+
+    return {
+      success: true,
+      data: clients,
+    };
+  } catch (error) {
+    logger.error("Error fetching clients from database:");
+    return {
+      success: false,
+      code: "ERR_DB_FETCH",
+      message: "Erro ao buscar clientes do banco de dados.",
+      archive: "clientsService.ts",
+      error: error,
+    };
+  }
+}
