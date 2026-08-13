@@ -295,3 +295,110 @@ export async function getClientsWithOrdersInBatches(
     };
   }
 }
+
+export async function updateClientsStatusInDatabase(
+  clients: any[],
+): Promise<Response | ErrorResponse> {
+  try {
+    const bulkOperations: any[] = [];
+    const now = new Date();
+    const timeLostInMs = parseInt(appConfig.app.timeLost) * 24 * 60 * 60 * 1000;
+
+    // 1. Processa todos os clientes de forma síncrona (não precisa mais de Promise.all)
+    const updatedClientsList = clients.map((c) => {
+      const client = c._doc ? c._doc : c;
+      const updatedAt = new Date(client.updated_at);
+      const hasOrders = (c.hasOrders || []) as {
+        order_id: number;
+        total_value: number;
+      }[];
+
+      // Verifica se existem novos pedidos
+      const newOrders = hasOrders.filter((order) => {
+        return !client.store_order_ids.includes(String(order.order_id));
+      });
+
+      // Caso 1: Não faz nada
+      if (
+        newOrders.length === 0 &&
+        updatedAt.getTime() + timeLostInMs > now.getTime()
+      ) {
+        return client;
+      }
+
+      // Caso 2: Atualiza o status para "LOST"
+      if (
+        newOrders.length === 0 &&
+        updatedAt.getTime() + timeLostInMs < now.getTime()
+      ) {
+        // Prepara a instrução para o MongoDB (mas não executa ainda)
+        bulkOperations.push({
+          updateOne: {
+            filter: { magento_id: client.magento_id },
+            update: { $set: { status: "LOST", updated_at: now } },
+          },
+        });
+
+        return { ...client, status: "LOST" };
+      }
+
+      // Caso 3: Atualiza o status para "SUCCESS"
+      if (newOrders.length > 0) {
+        const currentProfit = Number(client.projected_profit) || 0;
+        const additionalProfit = newOrders.reduce((acc, order) => {
+          return acc + (Number(order.total_value) || 0);
+        }, 0);
+        const newProjectedProfit = currentProfit + additionalProfit;
+
+        const newOrderIds = newOrders.map((order) => String(order.order_id));
+        const updatedOrderIdsList = [...client.store_order_ids, ...newOrderIds];
+
+        // Prepara a instrução para o MongoDB (mas não executa ainda)
+        bulkOperations.push({
+          updateOne: {
+            filter: { magento_id: client.magento_id },
+            update: {
+              $set: {
+                status: "SUCCESS",
+                projected_profit: newProjectedProfit,
+                store_order_ids: updatedOrderIdsList,
+                updated_at: now,
+              },
+            },
+          },
+        });
+
+        return {
+          ...client,
+          status: "SUCCESS",
+          projected_profit: newProjectedProfit,
+          store_order_ids: updatedOrderIdsList,
+        };
+      }
+
+      return client; // Fallback de segurança
+    });
+
+    // 2. Executa todas as atualizações no banco de dados de UMA SÓ VEZ
+    if (bulkOperations.length > 0) {
+      await ClientModel.bulkWrite(bulkOperations);
+    }
+
+    // 3. Retorna os dados processados para a API
+    return {
+      success: true,
+      message: "Status dos clientes atualizados com sucesso.",
+      data: updatedClientsList,
+    };
+  } catch (error) {
+    console.error(error);
+    logger.error("Error updating clients status in database:");
+    return {
+      success: false,
+      code: "ERR_DB_UPDATE",
+      message: "Erro ao atualizar status dos clientes no banco de dados.",
+      archive: "clientsService.ts",
+      error: error,
+    };
+  }
+}

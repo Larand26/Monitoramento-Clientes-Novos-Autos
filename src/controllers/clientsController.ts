@@ -8,6 +8,7 @@ import { saveClientsToCRM as saveClientsToCRMService } from "../services/clients
 import { saveClientsToDatabase as saveClientsToDatabaseService } from "../services/clientsService.js";
 import { getClientsFromDatabase as getClientsFromDatabaseService } from "../services/clientsService.js";
 import { getClientsWithOrdersInBatches as getClientsWithOrdersInBatchesService } from "../services/clientsService.js";
+import { updateClientsStatusInDatabase as updateClientsStatusInDatabaseService } from "../services/clientsService.js";
 
 export async function getClientsMagento(): Promise<Response | ErrorResponse> {
   try {
@@ -86,6 +87,23 @@ export async function getClientsWithOrdersInBatches(
       success: false,
       code: "ERR_BATCH_FETCH",
       message: "Erro ao buscar clientes com pedidos em lotes.",
+      archive: "clientsController.ts",
+      error: error,
+    };
+  }
+}
+
+export async function updateClientsStatusInDatabase(
+  clients: any[],
+): Promise<Response | ErrorResponse> {
+  try {
+    return await updateClientsStatusInDatabaseService(clients);
+  } catch (error) {
+    logger.error("Error updating clients status in database:");
+    return {
+      success: false,
+      code: "ERR_DB_UPDATE",
+      message: "Erro ao atualizar status dos clientes no banco de dados.",
       archive: "clientsController.ts",
       error: error,
     };

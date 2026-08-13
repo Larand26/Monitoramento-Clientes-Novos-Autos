@@ -58,4 +58,7 @@ export async function updateClients() {
   }
 
   // Atualiza o status do cliente no banco de dados
+  const updateResponse = await clientsController.updateClientsStatusInDatabase(
+    clientsWithOrdersResponse.data,
+  );
 }
