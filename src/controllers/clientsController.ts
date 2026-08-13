@@ -7,6 +7,7 @@ import { getClientsMagento as getClientsService } from "../services/clientsServi
 import { saveClientsToCRM as saveClientsToCRMService } from "../services/clientsService.js";
 import { saveClientsToDatabase as saveClientsToDatabaseService } from "../services/clientsService.js";
 import { getClientsFromDatabase as getClientsFromDatabaseService } from "../services/clientsService.js";
+import { getClientsWithOrdersInBatches as getClientsWithOrdersInBatchesService } from "../services/clientsService.js";
 
 export async function getClientsMagento(): Promise<Response | ErrorResponse> {
   try {
@@ -68,6 +69,23 @@ export async function getClientsFromDatabase(): Promise<
       success: false,
       code: "ERR_DB_FETCH",
       message: "Erro ao buscar clientes do banco de dados.",
+      archive: "clientsController.ts",
+      error: error,
+    };
+  }
+}
+
+export async function getClientsWithOrdersInBatches(
+  clients: any[],
+): Promise<Response | ErrorResponse> {
+  try {
+    return await getClientsWithOrdersInBatchesService(clients);
+  } catch (error) {
+    logger.error("Error fetching clients with orders in batches:");
+    return {
+      success: false,
+      code: "ERR_BATCH_FETCH",
+      message: "Erro ao buscar clientes com pedidos em lotes.",
       archive: "clientsController.ts",
       error: error,
     };

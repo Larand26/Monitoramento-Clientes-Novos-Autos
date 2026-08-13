@@ -41,6 +41,12 @@ export async function ingestNewCustomers() {
 export async function updateClients() {
   // Busca clientes no Banco de Dados
   const clientsResponse = await clientsController.getClientsFromDatabase();
+  if (!clientsResponse.success || !("data" in clientsResponse)) {
+    logger.warning("Nenhum cliente encontrado no banco de dados.");
+    return;
+  }
   // Verifica se ele tem Pedidos na Loja em lotes
+  const clientsWithOrdersResponse =
+    await clientsController.getClientsWithOrdersInBatches(clientsResponse.data);
   // Atualiza o status do cliente no banco de dados
 }

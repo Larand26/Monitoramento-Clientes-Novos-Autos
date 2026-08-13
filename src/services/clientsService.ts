@@ -252,3 +252,46 @@ export async function getClientsFromDatabase(): Promise<
     };
   }
 }
+
+export async function getClientsWithOrdersInBatches(
+  clients: any[],
+  batchSize: number = 100,
+): Promise<Response | ErrorResponse> {
+  try {
+    const clientsWithOrders = [];
+
+    for (let i = 0; i < clients.length; i += batchSize) {
+      const batch = clients.slice(i, i + batchSize);
+
+      const batchResults = await Promise.all(
+        batch.map(async (client) => {
+          const response = await axios.get(
+            `${appConfig.internalApi.url}/get-orders/${client.cnpj}`,
+            {
+              headers: {
+                Authorization: `Bearer ${appConfig.internalApi.token}`,
+                "Content-Type": "application/json",
+              },
+            },
+          );
+          return { ...client, hasOrders: response.data };
+        }),
+      );
+      clientsWithOrders.push(...batchResults);
+    }
+    return {
+      success: true,
+      data: clientsWithOrders,
+    };
+  } catch (error) {
+    console.error(error);
+    logger.error("Error fetching clients with orders in batches:");
+    return {
+      success: false,
+      code: "ERR_BATCH_FETCH",
+      message: "Erro ao buscar clientes com pedidos em lotes.",
+      archive: "clientsService.ts",
+      error: error,
+    };
+  }
+}
