@@ -14,6 +14,8 @@ interface ItokenData {
   expires_at: Date;
 }
 
+const customFieldsSlugs = ["cnpj", "cidade", "estado", "razao-social"];
+
 export async function getRdToken(): Promise<string | null> {
   try {
     const tokenData: ItokenData | null = await findOneData(
@@ -100,10 +102,16 @@ export async function createOrganization(
   client: ClientMagento,
 ): Promise<string> {
   try {
-    const body = {
+    const body: any = {
       data: {
         name: client.firstname,
         owner_id: appConfig.rd.ownerId,
+        custom_fields: {
+          cnpj: client.taxvat,
+          cidade: client.addresses?.[0]?.city || "",
+          estado: client.addresses?.[0]?.region?.region_code || "",
+          "razao-social": client.firstname,
+        },
       },
     };
 
@@ -118,6 +126,7 @@ export async function createOrganization(
         },
       },
     );
+
     return response.data.data.id;
   } catch (error) {
     logger.error("Error occurred while creating organization:");
@@ -182,27 +191,6 @@ export async function createDeal(
     return response.data.data.id;
   } catch (error) {
     logger.error("Error occurred while creating deal:");
-    throw error;
-  }
-}
-
-async function getCustomfields(token: string, entity: string) {
-  try {
-    const response = await axios.get(
-      `${appConfig.rd.url}/crm/v2/custom_fields`,
-      {
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        params: {
-          entity,
-        },
-      },
-    );
-    return response.data.data;
-  } catch (error) {
-    logger.error("Error occurred while fetching custom fields:");
     throw error;
   }
 }
