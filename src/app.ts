@@ -48,5 +48,14 @@ export async function updateClients() {
   // Verifica se ele tem Pedidos na Loja em lotes
   const clientsWithOrdersResponse =
     await clientsController.getClientsWithOrdersInBatches(clientsResponse.data);
+
+  if (
+    !clientsWithOrdersResponse.success ||
+    !("data" in clientsWithOrdersResponse)
+  ) {
+    logger.warning("Nenhum cliente com pedidos encontrado.");
+    return;
+  }
+
   // Atualiza o status do cliente no banco de dados
 }
