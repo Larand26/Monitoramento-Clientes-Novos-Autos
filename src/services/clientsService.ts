@@ -151,3 +151,26 @@ export async function saveClientsToCRM(
     };
   }
 }
+
+export async function saveClientsToDatabase(
+  clients: ClientMagento[],
+): Promise<Response | ErrorResponse> {
+  try {
+    // Lógica para salvar clientes no banco de dados
+    // Aqui você pode implementar a lógica específica para salvar os clientes no seu banco de dados
+    return {
+      success: true,
+      message: "Clientes salvos no banco de dados com sucesso.",
+      data: clients,
+    };
+  } catch (error) {
+    logger.error("Error saving clients to database:");
+    return {
+      success: false,
+      code: "ERR_DB_SAVE",
+      message: "Erro ao salvar clientes no banco de dados.",
+      archive: "clientsService.ts",
+      error: error,
+    };
+  }
+}

@@ -23,5 +23,8 @@ export async function ingestNewCustomers() {
     return;
   }
 
-  // Salva eles no banco de dados via api
+  // Salva eles no banco de dados
+  const dbResponse = await clientsController.saveClientsToDatabase(
+    saveResponse.data,
+  );
 }

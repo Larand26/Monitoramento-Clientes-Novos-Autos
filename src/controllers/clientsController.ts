@@ -5,6 +5,7 @@ import type { ClientMagento } from "../interfaces/client.type.js";
 
 import { getClientsMagento as getClientsService } from "../services/clientsService.js";
 import { saveClientsToCRM as saveClientsToCRMService } from "../services/clientsService.js";
+import { saveClientsToDatabase as saveClientsToDatabaseService } from "../services/clientsService.js";
 
 export async function getClientsMagento(): Promise<Response | ErrorResponse> {
   try {
@@ -32,6 +33,23 @@ export async function saveClientsToCRM(
       success: false,
       code: "ERR_CRM_SAVE",
       message: "Erro ao salvar clientes no CRM.",
+      archive: "clientsController.ts",
+      error: error,
+    };
+  }
+}
+
+export async function saveClientsToDatabase(
+  clients: ClientMagento[],
+): Promise<Response | ErrorResponse> {
+  try {
+    return await saveClientsToDatabaseService(clients);
+  } catch (error) {
+    logger.error("Error saving clients to database:");
+    return {
+      success: false,
+      code: "ERR_DB_SAVE",
+      message: "Erro ao salvar clientes no banco de dados.",
       archive: "clientsController.ts",
       error: error,
     };
