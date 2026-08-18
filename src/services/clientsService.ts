@@ -5,6 +5,7 @@ import type { ClientMagento } from "../interfaces/client.type";
 
 import ClientModel from "../models/client.model.js";
 import SellerModel from "../models/seller.model.js";
+import HistoryModel from "../models/history.model.js";
 
 import * as utils from "../utils/utils.js";
 import * as rdService from "../services/rdService.js";
@@ -302,10 +303,12 @@ export async function updateClientsStatusInDatabase(
 ): Promise<Response | ErrorResponse> {
   try {
     const bulkOperations: any[] = [];
+    const historyRecords: any[] = []; // 1. Acumulador de registros de histórico
     const now = new Date();
-    const timeLostInMs = parseInt(appConfig.app.timeLost) * 24 * 60 * 60 * 1000;
+    const timeLostInMs =
+      parseInt(appConfig.app?.timeLost || "0", 10) * 24 * 60 * 60 * 1000;
 
-    // 1. Pré-busca: Coleta nomes únicos de sellers que precisam ser consultados
+    // Pré-busca: Coleta nomes de sellers únicos
     const sellerNamesToFetch = new Set<string>();
     clients.forEach((c) => {
       const client = c._doc ? c._doc : c;
@@ -323,7 +326,7 @@ export async function updateClientsStatusInDatabase(
       }
     });
 
-    // 2. Busca todos os vendedores em lote (1 única query)
+    // Busca sellers em lote
     const sellerMap = new Map<string, any>();
     if (sellerNamesToFetch.size > 0) {
       const sellers = await SellerModel.find({
@@ -335,7 +338,7 @@ export async function updateClientsStatusInDatabase(
       });
     }
 
-    // 3. Processamento síncrono dos clientes
+    // Processamento síncrono dos clientes
     const updatedClientsList = clients.map((c) => {
       const client = c._doc ? c._doc : c;
       const updatedAt = new Date(client.updated_at);
@@ -362,6 +365,14 @@ export async function updateClientsStatusInDatabase(
         newOrders.length === 0 &&
         updatedAt.getTime() + timeLostInMs <= now.getTime()
       ) {
+        // Enfileira registro de histórico
+        historyRecords.push({
+          client_id: client.magento_id,
+          previous_status: client.status,
+          new_status: "LOST",
+          changed_at: now,
+        });
+
         bulkOperations.push({
           updateOne: {
             filter: { magento_id: client.magento_id },
@@ -389,9 +400,21 @@ export async function updateClientsStatusInDatabase(
         // Obtém o seller_id caso ainda não exista
         let resolvedSellerId = client.seller_id;
         if (!resolvedSellerId) {
-          const sellerName = newOrders[0]?.seller_name?.trim() || "";
-          resolvedSellerId = sellerMap.get(sellerName) || null;
+          const sellerName = newOrders[0]?.seller_name?.trim();
+          resolvedSellerId = sellerName
+            ? sellerMap.get(sellerName) || null
+            : null;
         }
+
+        // Enfileira registro de histórico
+        historyRecords.push({
+          client_id: client.magento_id,
+          previous_status: client.status,
+          new_status: "SUCCESS",
+          changed_at: now,
+          order_value: additionalProfit,
+          order_id: newOrderIds.join(", "),
+        });
 
         const updateFields: Record<string, any> = {
           status: "SUCCESS",
@@ -420,10 +443,15 @@ export async function updateClientsStatusInDatabase(
       return client;
     });
 
-    // 4. Executa atualizações em massa
-    if (bulkOperations.length > 0) {
-      await ClientModel.bulkWrite(bulkOperations);
-    }
+    // 2. Executa todas as gravações no banco em paralelo via lote
+    await Promise.all([
+      bulkOperations.length > 0
+        ? ClientModel.bulkWrite(bulkOperations)
+        : Promise.resolve(),
+      historyRecords.length > 0
+        ? HistoryModel.insertMany(historyRecords)
+        : Promise.resolve(),
+    ]);
 
     return {
       success: true,
