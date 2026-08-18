@@ -4,6 +4,7 @@ import type { Response } from "../interfaces/response.type";
 import type { ClientMagento } from "../interfaces/client.type";
 
 import ClientModel from "../models/client.model.js";
+import SellerModel from "../models/seller.model.js";
 
 import * as utils from "../utils/utils.js";
 import * as rdService from "../services/rdService.js";
@@ -304,21 +305,51 @@ export async function updateClientsStatusInDatabase(
     const now = new Date();
     const timeLostInMs = parseInt(appConfig.app.timeLost) * 24 * 60 * 60 * 1000;
 
-    // 1. Processa todos os clientes de forma síncrona (não precisa mais de Promise.all)
+    // 1. Pré-busca: Coleta nomes únicos de sellers que precisam ser consultados
+    const sellerNamesToFetch = new Set<string>();
+    clients.forEach((c) => {
+      const client = c._doc ? c._doc : c;
+      const hasOrders = (c.hasOrders || []) as {
+        order_id: number;
+        seller_name: string;
+      }[];
+      const newOrders = hasOrders.filter(
+        (order) => !client.store_order_ids?.includes(String(order.order_id)),
+      );
+
+      if (newOrders.length > 0 && !client.seller_id) {
+        const sellerName = newOrders[0]?.seller_name?.trim();
+        if (sellerName) sellerNamesToFetch.add(sellerName);
+      }
+    });
+
+    // 2. Busca todos os vendedores em lote (1 única query)
+    const sellerMap = new Map<string, any>();
+    if (sellerNamesToFetch.size > 0) {
+      const sellers = await SellerModel.find({
+        name: { $in: Array.from(sellerNamesToFetch) },
+      }).lean();
+
+      sellers.forEach((seller: any) => {
+        sellerMap.set(seller.name, seller._id);
+      });
+    }
+
+    // 3. Processamento síncrono dos clientes
     const updatedClientsList = clients.map((c) => {
       const client = c._doc ? c._doc : c;
       const updatedAt = new Date(client.updated_at);
       const hasOrders = (c.hasOrders || []) as {
         order_id: number;
         total_value: number;
+        seller_name: string;
       }[];
 
-      // Verifica se existem novos pedidos
       const newOrders = hasOrders.filter((order) => {
-        return !client.store_order_ids.includes(String(order.order_id));
+        return !client.store_order_ids?.includes(String(order.order_id));
       });
 
-      // Caso 1: Não faz nada
+      // Caso 1: Sem pedidos e dentro do prazo -> Mantém
       if (
         newOrders.length === 0 &&
         updatedAt.getTime() + timeLostInMs > now.getTime()
@@ -326,12 +357,11 @@ export async function updateClientsStatusInDatabase(
         return client;
       }
 
-      // Caso 2: Atualiza o status para "LOST"
+      // Caso 2: Sem pedidos e expirou -> LOST
       if (
         newOrders.length === 0 &&
-        updatedAt.getTime() + timeLostInMs < now.getTime()
+        updatedAt.getTime() + timeLostInMs <= now.getTime()
       ) {
-        // Prepara a instrução para o MongoDB (mas não executa ainda)
         bulkOperations.push({
           updateOne: {
             filter: { magento_id: client.magento_id },
@@ -339,10 +369,10 @@ export async function updateClientsStatusInDatabase(
           },
         });
 
-        return { ...client, status: "LOST" };
+        return { ...client, status: "LOST", updated_at: now };
       }
 
-      // Caso 3: Atualiza o status para "SUCCESS"
+      // Caso 3: Novos pedidos -> SUCCESS
       if (newOrders.length > 0) {
         const currentProfit = Number(client.projected_profit) || 0;
         const additionalProfit = newOrders.reduce((acc, order) => {
@@ -351,40 +381,50 @@ export async function updateClientsStatusInDatabase(
         const newProjectedProfit = currentProfit + additionalProfit;
 
         const newOrderIds = newOrders.map((order) => String(order.order_id));
-        const updatedOrderIdsList = [...client.store_order_ids, ...newOrderIds];
+        const updatedOrderIdsList = [
+          ...(client.store_order_ids || []),
+          ...newOrderIds,
+        ];
 
-        // Prepara a instrução para o MongoDB (mas não executa ainda)
+        // Obtém o seller_id caso ainda não exista
+        let resolvedSellerId = client.seller_id;
+        if (!resolvedSellerId) {
+          const sellerName = newOrders[0]?.seller_name?.trim() || "";
+          resolvedSellerId = sellerMap.get(sellerName) || null;
+        }
+
+        const updateFields: Record<string, any> = {
+          status: "SUCCESS",
+          projected_profit: newProjectedProfit,
+          store_order_ids: updatedOrderIdsList,
+          updated_at: now,
+        };
+
+        if (resolvedSellerId) {
+          updateFields.seller_id = resolvedSellerId;
+        }
+
         bulkOperations.push({
           updateOne: {
             filter: { magento_id: client.magento_id },
-            update: {
-              $set: {
-                status: "SUCCESS",
-                projected_profit: newProjectedProfit,
-                store_order_ids: updatedOrderIdsList,
-                updated_at: now,
-              },
-            },
+            update: { $set: updateFields },
           },
         });
 
         return {
           ...client,
-          status: "SUCCESS",
-          projected_profit: newProjectedProfit,
-          store_order_ids: updatedOrderIdsList,
+          ...updateFields,
         };
       }
 
-      return client; // Fallback de segurança
+      return client;
     });
 
-    // 2. Executa todas as atualizações no banco de dados de UMA SÓ VEZ
+    // 4. Executa atualizações em massa
     if (bulkOperations.length > 0) {
       await ClientModel.bulkWrite(bulkOperations);
     }
 
-    // 3. Retorna os dados processados para a API
     return {
       success: true,
       message: "Status dos clientes atualizados com sucesso.",
