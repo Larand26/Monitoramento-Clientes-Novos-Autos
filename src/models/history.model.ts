@@ -1,10 +1,10 @@
 import mongoose from "mongoose";
 
 const historySchema = new mongoose.Schema({
-  client_id: { type: String, required: true },
+  client_id: { type: mongoose.Schema.Types.ObjectId, required: true },
   previous_status: { type: String, required: false },
   new_status: { type: String, required: false },
-  changed_at: { type: String, required: true },
+  changed_at: { type: Date, required: true },
   order_value: { type: Number, required: false },
   order_id: { type: String, required: false },
 });

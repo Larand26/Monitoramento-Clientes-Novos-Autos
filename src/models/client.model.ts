@@ -6,7 +6,7 @@ const clientSchema = new mongoose.Schema({
   store_id: { type: String, required: false },
   name: { type: String, required: true },
   cnpj: { type: String, required: true },
-  seller_id: { type: Number, required: false },
+  seller_id: { type: mongoose.Types.ObjectId, required: false },
   magento_order_ids: { type: Array<String>, required: false },
   store_order_ids: { type: Array<String>, required: false },
   status: { type: String, required: true, enum: ["IN_CRM", "LOST", "SUCCESS"] },

@@ -315,6 +315,7 @@ export async function updateClientsStatusInDatabase(
       const hasOrders = (c.hasOrders || []) as {
         order_id: number;
         seller_name: string;
+        entity_id: number;
       }[];
       const newOrders = hasOrders.filter(
         (order) => !client.store_order_ids?.includes(String(order.order_id)),
@@ -332,12 +333,10 @@ export async function updateClientsStatusInDatabase(
       const sellers = await SellerModel.find({
         name: { $in: Array.from(sellerNamesToFetch) },
       }).lean();
-
       sellers.forEach((seller: any) => {
         sellerMap.set(seller.name, seller._id);
       });
     }
-
     // Processamento síncrono dos clientes
     const updatedClientsList = clients.map((c) => {
       const client = c._doc ? c._doc : c;
@@ -346,6 +345,7 @@ export async function updateClientsStatusInDatabase(
         order_id: number;
         total_value: number;
         seller_name: string;
+        entity_id: number;
       }[];
 
       const newOrders = hasOrders.filter((order) => {
@@ -367,10 +367,10 @@ export async function updateClientsStatusInDatabase(
       ) {
         // Enfileira registro de histórico
         historyRecords.push({
-          client_id: client.magento_id,
+          client_id: client._id,
           previous_status: client.status,
           new_status: "LOST",
-          changed_at: now,
+          changed_at: new Date(now),
         });
 
         bulkOperations.push({
@@ -406,12 +406,15 @@ export async function updateClientsStatusInDatabase(
             : null;
         }
 
+        // Pega o store_id
+        const newStoreId = String(newOrders[0]?.entity_id) || client.store_id;
+
         // Enfileira registro de histórico
         historyRecords.push({
-          client_id: client.magento_id,
+          client_id: client._id,
           previous_status: client.status,
           new_status: "SUCCESS",
-          changed_at: now,
+          changed_at: new Date(now),
           order_value: additionalProfit,
           order_id: newOrderIds.join(", "),
         });
@@ -420,6 +423,7 @@ export async function updateClientsStatusInDatabase(
           status: "SUCCESS",
           projected_profit: newProjectedProfit,
           store_order_ids: updatedOrderIdsList,
+          store_id: newStoreId,
           updated_at: now,
         };
 
