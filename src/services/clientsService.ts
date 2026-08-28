@@ -49,10 +49,15 @@ export async function getClientsMagento(): Promise<Response | ErrorResponse> {
 
     const clients: ClientMagento[] = response.data.items || [];
 
+    // Remove os clientes que tem @b2b no email
+    const filteredClients = clients.filter(
+      (client) => !client.email.includes("@b2b"),
+    );
+
     return {
       success: true,
       message: "Clientes buscados com sucesso.",
-      data: clients,
+      data: filteredClients,
     };
   } catch (error) {
     logger.error("Error fetching clients from Magento:");
