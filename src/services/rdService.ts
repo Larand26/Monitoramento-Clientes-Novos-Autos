@@ -173,7 +173,7 @@ export async function createDeal(
   try {
     const body = {
       data: {
-        name: client.firstname,
+        name: "Cliente Novo",
         status: "ongoing",
         stage_id: appConfig.rd.dealStageId,
         owner_id: appConfig.rd.ownerId,
