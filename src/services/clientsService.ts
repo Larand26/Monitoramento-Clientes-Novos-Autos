@@ -309,151 +309,140 @@ export async function updateClientsStatusInDatabase(
 ): Promise<Response | ErrorResponse> {
   try {
     const bulkOperations: any[] = [];
-    const historyRecords: any[] = []; // 1. Acumulador de registros de histórico
+    const historyRecords: any[] = [];
     const now = new Date();
-    const timeLostInMs =
-      parseInt(appConfig.app?.timeLost || "0", 10) * 24 * 60 * 60 * 1000;
 
-    // Pré-busca: Coleta nomes de sellers únicos
-    const sellerNamesToFetch = new Set<string>();
-    clients.forEach((c) => {
-      const client = c._doc ? c._doc : c;
-      const hasOrders = (c.hasOrders || []) as {
-        order_id: number;
-        seller_name: string;
-        entity_id: number;
-      }[];
-      const newOrders = hasOrders.filter(
-        (order) => !client.store_order_ids?.includes(String(order.order_id)),
-      );
-
-      if (newOrders.length > 0 && !client.seller_id) {
-        const sellerName = newOrders[0]?.seller_name?.trim();
-        if (sellerName) sellerNamesToFetch.add(sellerName);
-      }
-    });
-
-    // Busca sellers em lote
-    const sellerMap = new Map<string, any>();
-    if (sellerNamesToFetch.size > 0) {
-      const sellers = await SellerModel.find({
-        name: { $in: Array.from(sellerNamesToFetch) },
-      }).lean();
-      sellers.forEach((seller: any) => {
-        sellerMap.set(seller.name, seller._id);
-      });
-    }
-    // Processamento síncrono dos clientes
     const updatedClientsList = clients.map((c) => {
       const client = c._doc ? c._doc : c;
-      const updatedAt = new Date(client.updated_at);
-      const hasOrders = (c.hasOrders || []) as {
-        order_id: number;
-        total_value: number;
-        seller_name: string;
-        entity_id: number;
-      }[];
+      const hasOrders = (c.hasOrders || []) as any[];
 
-      const newOrders = hasOrders.filter((order) => {
-        return !client.store_order_ids?.includes(String(order.order_id));
+      let avg_days_between_purchases = 20;
+      let lastReferenceDate = new Date(client.updated_at);
+
+      // Regra 1: Cálculo da Média de Dias (avg_days_between_purchases)
+      if (hasOrders.length === 0) {
+        avg_days_between_purchases = 20;
+      } else if (hasOrders.length === 1) {
+        avg_days_between_purchases = 20;
+        lastReferenceDate = new Date(
+          hasOrders[0].created_at || client.updated_at,
+        );
+      } else {
+        // Ordenar pedidos garantindo fallback para data 0 caso seja undefined
+        const sortedOrders = [...hasOrders].sort((a, b) => {
+          const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return timeA - timeB;
+        });
+
+        // Tenta pegar a data do último pedido, faz fallback para updated_at se for inválido
+        const lastOrderDateStr =
+          sortedOrders[sortedOrders.length - 1].created_at;
+        const parsedLastDate = lastOrderDateStr
+          ? new Date(lastOrderDateStr)
+          : new Date(client.updated_at);
+        lastReferenceDate = isNaN(parsedLastDate.getTime())
+          ? new Date(client.updated_at)
+          : parsedLastDate;
+
+        let totalDaysDiff = 0;
+        let validIntervals = 0;
+
+        for (let i = 1; i < sortedOrders.length; i++) {
+          const prevDateStr = sortedOrders[i - 1].created_at;
+          const currDateStr = sortedOrders[i].created_at;
+
+          if (prevDateStr && currDateStr) {
+            const prevDate = new Date(prevDateStr).getTime();
+            const currDate = new Date(currDateStr).getTime();
+
+            // Só calcula a diferença se ambas as datas forem válidas
+            if (!isNaN(prevDate) && !isNaN(currDate)) {
+              const diffTime = Math.abs(currDate - prevDate);
+              const diffDays = diffTime / (1000 * 60 * 60 * 24);
+              totalDaysDiff += diffDays;
+              validIntervals++;
+            }
+          }
+        }
+
+        if (validIntervals > 0) {
+          const rawAvg = totalDaysDiff / validIntervals;
+          // Se por acaso ainda der NaN (ex: divisão por zero não mapeada), fallback para 20
+          avg_days_between_purchases = isNaN(rawAvg) ? 20 : Math.round(rawAvg);
+        } else {
+          // Se não houver intervalos válidos com datas, assume o padrão
+          avg_days_between_purchases = 20;
+        }
+      }
+
+      // Regra 2: Atualização de Status e Vencimento
+      const deadline = new Date(lastReferenceDate);
+      deadline.setDate(deadline.getDate() + avg_days_between_purchases);
+
+      // Diferença em dias entre a Data Limite e hoje
+      const daysUntilDeadline =
+        (deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+
+      let newStatus = client.status;
+      let isExpiringSoon = false;
+
+      if (daysUntilDeadline < 0) {
+        // Data atual é maior que a Data Limite
+        newStatus = "LOST";
+      } else {
+        // Está dentro do prazo.
+        // Se houver pedidos e o status não for SUCCESS, atualiza para SUCCESS.
+        if (hasOrders.length > 0 && client.status !== "SUCCESS") {
+          newStatus = "SUCCESS";
+        }
+
+        // Se estiver faltando 3 dias ou menos para a Data Limite, muda para FREEZE
+        if (daysUntilDeadline <= 3) {
+          newStatus = "FREEZE";
+          isExpiringSoon = true;
+          logger.info(
+            `Aviso: Cliente ${client.name} (Magento ID: ${client.magento_id}) está quase vencendo! Faltam ${Math.max(0, Math.ceil(daysUntilDeadline))} dias (Data Limite: ${deadline.toISOString().split("T")[0]}). Status alterado para FREEZE.`,
+          );
+        }
+      }
+
+      const updateFields: any = {
+        status: newStatus,
+        avg_days_between_purchases: avg_days_between_purchases,
+        updated_at: now,
+      };
+
+      // Atualiza projected_profit somando os valores caso o cliente tenha pedidos
+      if (hasOrders.length > 0) {
+        updateFields.projected_profit = hasOrders.reduce(
+          (acc, order) => acc + (Number(order.total_value) || 0),
+          0,
+        );
+        updateFields.store_id =
+          String(hasOrders[0]?.entity_id) || client.store_id;
+      }
+
+      // Se o status mudou, enfileira o registro no histórico
+      if (newStatus !== client.status) {
+        historyRecords.push({
+          client_id: client._id,
+          previous_status: client.status,
+          new_status: newStatus,
+          changed_at: new Date(now),
+        });
+      }
+
+      bulkOperations.push({
+        updateOne: {
+          filter: { magento_id: client.magento_id },
+          update: { $set: updateFields },
+        },
       });
 
-      // Caso 1: Sem pedidos e dentro do prazo -> Mantém
-      if (
-        newOrders.length === 0 &&
-        updatedAt.getTime() + timeLostInMs > now.getTime()
-      ) {
-        return client;
-      }
-
-      // Caso 2: Sem pedidos e expirou -> LOST
-      if (
-        newOrders.length === 0 &&
-        updatedAt.getTime() + timeLostInMs <= now.getTime()
-      ) {
-        // Enfileira registro de histórico
-        historyRecords.push({
-          client_id: client._id,
-          previous_status: client.status,
-          new_status: "LOST",
-          changed_at: new Date(now),
-        });
-
-        bulkOperations.push({
-          updateOne: {
-            filter: { magento_id: client.magento_id },
-            update: { $set: { status: "LOST", updated_at: now } },
-          },
-        });
-
-        return { ...client, status: "LOST", updated_at: now };
-      }
-
-      // Caso 3: Novos pedidos -> SUCCESS
-      if (newOrders.length > 0) {
-        const currentProfit = Number(client.projected_profit) || 0;
-        const additionalProfit = newOrders.reduce((acc, order) => {
-          return acc + (Number(order.total_value) || 0);
-        }, 0);
-        const newProjectedProfit = currentProfit + additionalProfit;
-
-        const newOrderIds = newOrders.map((order) => String(order.order_id));
-        const updatedOrderIdsList = [
-          ...(client.store_order_ids || []),
-          ...newOrderIds,
-        ];
-
-        // Obtém o seller_id caso ainda não exista
-        let resolvedSellerId = client.seller_id;
-        if (!resolvedSellerId) {
-          const sellerName = newOrders[0]?.seller_name?.trim();
-          resolvedSellerId = sellerName
-            ? sellerMap.get(sellerName) || null
-            : null;
-        }
-
-        // Pega o store_id
-        const newStoreId = String(newOrders[0]?.entity_id) || client.store_id;
-
-        // Enfileira registro de histórico
-        historyRecords.push({
-          client_id: client._id,
-          previous_status: client.status,
-          new_status: "SUCCESS",
-          changed_at: new Date(now),
-          order_value: additionalProfit,
-          order_id: newOrderIds.join(", "),
-        });
-
-        const updateFields: Record<string, any> = {
-          status: "SUCCESS",
-          projected_profit: newProjectedProfit,
-          store_order_ids: updatedOrderIdsList,
-          store_id: newStoreId,
-          updated_at: now,
-        };
-
-        if (resolvedSellerId) {
-          updateFields.seller_id = resolvedSellerId;
-        }
-
-        bulkOperations.push({
-          updateOne: {
-            filter: { magento_id: client.magento_id },
-            update: { $set: updateFields },
-          },
-        });
-
-        return {
-          ...client,
-          ...updateFields,
-        };
-      }
-
-      return client;
+      return { ...client, ...updateFields, isExpiringSoon };
     });
 
-    // 2. Executa todas as gravações no banco em paralelo via lote
     await Promise.all([
       bulkOperations.length > 0
         ? ClientModel.bulkWrite(bulkOperations)
