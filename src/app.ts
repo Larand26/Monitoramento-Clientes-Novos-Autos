@@ -61,4 +61,8 @@ export async function updateClients() {
   const updateResponse = await clientsController.updateClientsStatusInDatabase(
     clientsWithOrdersResponse.data,
   );
+
+  const updateOrdersResponse = await clientsController.updateOrdersInDatabase(
+    clientsWithOrdersResponse.data,
+  );
 }

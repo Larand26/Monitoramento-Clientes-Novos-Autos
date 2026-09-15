@@ -6,6 +6,7 @@ import type { ClientMagento } from "../interfaces/client.type";
 import ClientModel from "../models/client.model.js";
 import SellerModel from "../models/seller.model.js";
 import HistoryModel from "../models/history.model.js";
+import OrderModel from "../models/order.model.js";
 
 import * as utils from "../utils/utils.js";
 import * as rdService from "../services/rdService.js";
@@ -273,7 +274,7 @@ export async function getClientsWithOrdersInBatches(
       const batchResults = await Promise.all(
         batch.map(async (client) => {
           const response = await axios.get(
-            `${appConfig.internalApi.url}/get-orders/${client.cnpj}`,
+            `${appConfig.internalApi.url}/get-orders/${utils.cleanCnpj(client.cnpj)}`,
             {
               headers: {
                 Authorization: `Bearer ${appConfig.internalApi.token}`,
@@ -474,6 +475,107 @@ export async function updateClientsStatusInDatabase(
       success: false,
       code: "ERR_DB_UPDATE",
       message: "Erro ao atualizar status dos clientes no banco de dados.",
+      archive: "clientsService.ts",
+      error: error,
+    };
+  }
+}
+
+export async function updateOrdersInDatabase(
+  clients: any[],
+): Promise<Response | ErrorResponse> {
+  try {
+    // 1. Coletar todos os IDs de pedidos (store_order_id) vindos dos clientes
+    const allIncomingOrderIds = new Set<string>();
+    clients.forEach((c) => {
+      const hasOrders = (c.hasOrders || []) as any[];
+      hasOrders.forEach((order) =>
+        allIncomingOrderIds.add(String(order.order_id)),
+      );
+    });
+
+    // 2. Buscar no banco de dados quais desses pedidos já existem
+    const existingOrders = await OrderModel.find({
+      store_order_id: { $in: Array.from(allIncomingOrderIds) },
+    })
+      .select("store_order_id")
+      .lean();
+
+    const existingOrderIds = new Set(
+      existingOrders.map((o: any) => o.store_order_id),
+    );
+
+    // 3. Identificar quais vendedores precisamos buscar apenas para os pedidos NOVOS
+    const sellerNamesToFetch = new Set<string>();
+    clients.forEach((c) => {
+      const hasOrders = (c.hasOrders || []) as any[];
+      const newOrders = hasOrders.filter(
+        (order) => !existingOrderIds.has(String(order.order_id)),
+      );
+
+      newOrders.forEach((order) => {
+        const sellerName = order.seller_name?.trim();
+        if (sellerName) sellerNamesToFetch.add(sellerName);
+      });
+    });
+
+    // 4. Mapear os vendedores (seller_name -> seller_id)
+    const sellerMap = new Map<string, any>();
+    if (sellerNamesToFetch.size > 0) {
+      const sellers = await SellerModel.find({
+        name: { $in: Array.from(sellerNamesToFetch) },
+      }).lean();
+
+      sellers.forEach((seller: any) => {
+        sellerMap.set(seller.name, seller._id);
+      });
+    }
+    // 5. Montar a lista de pedidos a serem inseridos
+    const ordersToInsert: any[] = [];
+
+    clients.forEach((c) => {
+      const client = c._doc ? c._doc : c;
+      const hasOrders = (c.hasOrders || []) as any[];
+
+      // Filtra usando o Set do banco de dados, ignorando client.store_order_ids
+      const newOrders = hasOrders.filter(
+        (order) => !existingOrderIds.has(String(order.order_id)),
+      );
+
+      newOrders.forEach((order) => {
+        const sellerName = order.seller_name?.trim();
+        const resolvedSellerId = sellerName
+          ? sellerMap.get(sellerName)
+          : client.seller_id;
+
+        ordersToInsert.push({
+          store_order_id: String(order.order_id),
+          seller_id: resolvedSellerId || null,
+          order_date: order.created_at || new Date().toISOString(),
+          total_amount: Number(order.total_value) || 0,
+          client_name: client.name,
+          client_id: client._id,
+        });
+      });
+    });
+    // 6. Inserir todos os novos pedidos no banco (Bulk Insert)
+    if (ordersToInsert.length > 0) {
+      await OrderModel.insertMany(ordersToInsert);
+      logger.info(`${ordersToInsert.length} novos pedidos inseridos no banco.`);
+    }
+
+    return {
+      success: true,
+      message: "Pedidos dos clientes atualizados com sucesso.",
+      data: ordersToInsert,
+    };
+  } catch (error) {
+    console.error(error);
+    logger.error("Error updating orders in database:");
+    return {
+      success: false,
+      code: "ERR_DB_UPDATE_ORDERS",
+      message: "Erro ao atualizar pedidos dos clientes no banco de dados.",
       archive: "clientsService.ts",
       error: error,
     };

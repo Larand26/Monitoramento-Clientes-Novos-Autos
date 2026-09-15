@@ -9,6 +9,7 @@ import { saveClientsToDatabase as saveClientsToDatabaseService } from "../servic
 import { getClientsFromDatabase as getClientsFromDatabaseService } from "../services/clientsService.js";
 import { getClientsWithOrdersInBatches as getClientsWithOrdersInBatchesService } from "../services/clientsService.js";
 import { updateClientsStatusInDatabase as updateClientsStatusInDatabaseService } from "../services/clientsService.js";
+import { updateOrdersInDatabase as updateOrdersInDatabaseService } from "../services/clientsService.js";
 
 export async function getClientsMagento(): Promise<Response | ErrorResponse> {
   try {
@@ -104,6 +105,23 @@ export async function updateClientsStatusInDatabase(
       success: false,
       code: "ERR_DB_UPDATE",
       message: "Erro ao atualizar status dos clientes no banco de dados.",
+      archive: "clientsController.ts",
+      error: error,
+    };
+  }
+}
+
+export async function updateOrdersInDatabase(
+  clients: any[],
+): Promise<Response | ErrorResponse> {
+  try {
+    return await updateOrdersInDatabaseService(clients);
+  } catch (error) {
+    logger.error("Error updating orders in database:");
+    return {
+      success: false,
+      code: "ERR_DB_UPDATE_ORDERS",
+      message: "Erro ao atualizar pedidos no banco de dados.",
       archive: "clientsController.ts",
       error: error,
     };
