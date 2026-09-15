@@ -325,19 +325,19 @@ export async function updateClientsStatusInDatabase(
       } else if (hasOrders.length === 1) {
         avg_days_between_purchases = 20;
         lastReferenceDate = new Date(
-          hasOrders[0].created_at || client.updated_at,
+          hasOrders[0].order_date || client.updated_at,
         );
       } else {
         // Ordenar pedidos garantindo fallback para data 0 caso seja undefined
         const sortedOrders = [...hasOrders].sort((a, b) => {
-          const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          const timeA = a.order_date ? new Date(a.order_date).getTime() : 0;
+          const timeB = b.order_date ? new Date(b.order_date).getTime() : 0;
           return timeA - timeB;
         });
 
         // Tenta pegar a data do último pedido, faz fallback para updated_at se for inválido
         const lastOrderDateStr =
-          sortedOrders[sortedOrders.length - 1].created_at;
+          sortedOrders[sortedOrders.length - 1].order_date;
         const parsedLastDate = lastOrderDateStr
           ? new Date(lastOrderDateStr)
           : new Date(client.updated_at);
@@ -349,8 +349,8 @@ export async function updateClientsStatusInDatabase(
         let validIntervals = 0;
 
         for (let i = 1; i < sortedOrders.length; i++) {
-          const prevDateStr = sortedOrders[i - 1].created_at;
-          const currDateStr = sortedOrders[i].created_at;
+          const prevDateStr = sortedOrders[i - 1].order_date;
+          const currDateStr = sortedOrders[i].order_date;
 
           if (prevDateStr && currDateStr) {
             const prevDate = new Date(prevDateStr).getTime();
@@ -458,7 +458,7 @@ export async function updateClientsStatusInDatabase(
       data: updatedClientsList,
     };
   } catch (error) {
-    console.error(error);
+    console.error(JSON.stringify(error));
     logger.error("Error updating clients status in database:");
     return {
       success: false,
@@ -540,7 +540,7 @@ export async function updateOrdersInDatabase(
         ordersToInsert.push({
           store_order_id: String(order.order_id),
           seller_id: resolvedSellerId || null,
-          order_date: order.created_at || new Date().toISOString(),
+          order_date: order.order_date || new Date().toISOString(),
           total_amount: Number(order.total_value) || 0,
           client_name: client.name,
           client_id: client._id,
@@ -559,7 +559,7 @@ export async function updateOrdersInDatabase(
       data: ordersToInsert,
     };
   } catch (error) {
-    console.error(error);
+    console.error(JSON.stringify(error));
     logger.error("Error updating orders in database:");
     return {
       success: false,
