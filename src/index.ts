@@ -31,6 +31,6 @@ cron.schedule(appConfig.app.cronUpdate, async () => {
 if (appConfig.app.mode === "development") {
   console.log("Running in development mode");
   await ingestNewCustomers();
-  await updateClients();
   await ingestNewCustomersFromStore();
+  await updateClients();
 }
