@@ -426,6 +426,13 @@ export async function updateClientsStatusInDatabase(
           String(hasOrders[0]?.entity_id) || client.store_id;
       }
 
+      logger.info(
+        `Cliente ${client.name} (Magento ID: ${client.magento_id}) atualizado. Status: ${newStatus}, Dias até o vencimento: ${Math.max(
+          0,
+          Math.ceil(daysUntilDeadline),
+        )}, Data Limite: ${deadline.toISOString().split("T")[0]}, Lucro Projetado: ${updateFields.projected_profit}`,
+      );
+
       // Se o status mudou, enfileira o registro no histórico
       if (newStatus !== client.status) {
         historyRecords.push({
@@ -438,7 +445,7 @@ export async function updateClientsStatusInDatabase(
 
       bulkOperations.push({
         updateOne: {
-          filter: { magento_id: client.magento_id },
+          filter: { _id: client._id },
           update: { $set: updateFields },
         },
       });
