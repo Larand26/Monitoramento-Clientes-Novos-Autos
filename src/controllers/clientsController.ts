@@ -127,3 +127,18 @@ export async function updateOrdersInDatabase(
     };
   }
 }
+
+export async function getClientsStore(): Promise<Response | ErrorResponse> {
+  try {
+    return await getClientsService();
+  } catch (error) {
+    logger.error("Error fetching clients from store:");
+    return {
+      success: false,
+      code: "ERR_STORE_FETCH",
+      message: "Erro ao buscar clientes da loja.",
+      archive: "clientsController.ts",
+      error: error,
+    };
+  }
+}

@@ -1,7 +1,11 @@
 import appConfig from "./config/app.config.js";
 import cron from "node-cron";
 
-import { ingestNewCustomers, updateClients } from "./app.js";
+import {
+  ingestNewCustomers,
+  updateClients,
+  ingestNewCustomersFromStore,
+} from "./app.js";
 import { connectToMongoDB } from "./db/mongodb.js";
 
 (async () => {
@@ -26,6 +30,7 @@ cron.schedule(appConfig.app.cronUpdate, async () => {
 
 if (appConfig.app.mode === "development") {
   console.log("Running in development mode");
-  await ingestNewCustomers();
-  await updateClients();
+  // await ingestNewCustomers();
+  // await updateClients();
+  await ingestNewCustomersFromStore();
 }

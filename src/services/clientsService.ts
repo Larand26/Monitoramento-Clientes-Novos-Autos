@@ -570,3 +570,31 @@ export async function updateOrdersInDatabase(
     };
   }
 }
+
+export async function getClientsStore(): Promise<Response | ErrorResponse> {
+  try {
+    const response = await axios.get(
+      `${appConfig.internalApi.url}/get-orders`,
+      {
+        headers: {
+          Authorization: `Bearer ${appConfig.internalApi.token}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    return {
+      success: true,
+      message: "Clientes da loja buscados com sucesso.",
+      data: response.data,
+    };
+  } catch (error) {
+    console.error(JSON.stringify(error));
+    return {
+      success: false,
+      code: "ERR_STORE_FETCH",
+      message: "Erro ao buscar clientes da loja.",
+      archive: "clientsService.ts",
+      error: error,
+    };
+  }
+}
