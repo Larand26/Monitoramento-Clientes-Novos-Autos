@@ -1,5 +1,5 @@
 export interface ClientMagento {
-  id: number;
+  id?: number;
   group_id: number;
   default_billing: string;
   default_shipping: string;

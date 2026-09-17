@@ -175,27 +175,30 @@ export async function saveClientsToDatabase(
           ? client.taxvat.replace(/[^a-zA-Z0-9]/g, "")
           : "";
 
+        // Busca pelo CNPJ para garantir que não haja duplicidade[cite: 5]
         const c = await mongodb.findOneData(
           ClientModel,
-          { magento_id: String(client.id) },
+          { cnpj: cnpjLimpo }, // <-- Busca atualizada para usar o CNPJ[cite: 5]
           "clients",
         );
 
         if (c) {
           logger.info(
-            `Cliente ${client.firstname} já existe no banco de dados.`,
+            `Cliente ${client.firstname} já existe no banco de dados (CNPJ: ${cnpjLimpo}).`,
           );
           return { success: true, data: c };
         }
 
         const data = {
-          magento_id: String(client.id),
+          magento_id: String(client.id) || null,
           rd_station_id: client.organizationId || null,
           name: client.firstname,
           cnpj: cnpjLimpo,
           status: "IN_CRM",
           created_at: new Date(client.created_at),
           updated_at: new Date(client.updated_at),
+          avg_days_between_purchases: 20,
+          projected_profit: 0,
         };
 
         try {

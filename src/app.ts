@@ -76,5 +76,26 @@ export async function ingestNewCustomersFromStore() {
     return;
   }
 
-  // Salva eles no mongoDb
+  console.log(clientsResponse.data);
+  const clients = clientsResponse.data.map((client: any) => {
+    return {
+      firstname: client.client_name,
+      taxvat: client.client_cnpj,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+  });
+
+  // Exclui clients repetidos com base no taxvat, com as tipagens explícitas
+  const uniqueClients = clients.filter(
+    (client: { taxvat: string }, index: number, self: { taxvat: string }[]) =>
+      index ===
+      self.findIndex((c: { taxvat: string }) => c.taxvat === client.taxvat),
+  );
+
+  // Salva eles no banco de dados
+  const dbResponse =
+    await clientsController.saveClientsToDatabase(uniqueClients);
+
+  console.log(dbResponse);
 }

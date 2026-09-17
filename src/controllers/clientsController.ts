@@ -10,6 +10,7 @@ import { getClientsFromDatabase as getClientsFromDatabaseService } from "../serv
 import { getClientsWithOrdersInBatches as getClientsWithOrdersInBatchesService } from "../services/clientsService.js";
 import { updateClientsStatusInDatabase as updateClientsStatusInDatabaseService } from "../services/clientsService.js";
 import { updateOrdersInDatabase as updateOrdersInDatabaseService } from "../services/clientsService.js";
+import { getClientsStore as getClientsStoreService } from "../services/clientsService.js";
 
 export async function getClientsMagento(): Promise<Response | ErrorResponse> {
   try {
@@ -130,7 +131,7 @@ export async function updateOrdersInDatabase(
 
 export async function getClientsStore(): Promise<Response | ErrorResponse> {
   try {
-    return await getClientsService();
+    return await getClientsStoreService();
   } catch (error) {
     logger.error("Error fetching clients from store:");
     return {
