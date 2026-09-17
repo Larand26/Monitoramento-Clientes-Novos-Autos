@@ -76,7 +76,6 @@ export async function ingestNewCustomersFromStore() {
     return;
   }
 
-  console.log(clientsResponse.data);
   const clients = clientsResponse.data.map((client: any) => {
     return {
       firstname: client.client_name,
@@ -96,6 +95,4 @@ export async function ingestNewCustomersFromStore() {
   // Salva eles no banco de dados
   const dbResponse =
     await clientsController.saveClientsToDatabase(uniqueClients);
-
-  console.log(dbResponse);
 }
