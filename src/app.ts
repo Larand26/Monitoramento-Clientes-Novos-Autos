@@ -66,3 +66,15 @@ export async function updateClients() {
     clientsWithOrdersResponse.data,
   );
 }
+
+export async function ingestNewCustomersFromStore() {
+  // Busca clientes na Loja
+  const clientsResponse = await clientsController.getClientsStore();
+
+  if (!clientsResponse.success || !("data" in clientsResponse)) {
+    logger.warning("Nenhum cliente encontrado na Loja.");
+    return;
+  }
+
+  // Salva eles no mongoDb
+}
